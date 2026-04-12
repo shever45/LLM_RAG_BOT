@@ -1,16 +1,16 @@
-# используем официальный образ Python
+# используем образ Python
 FROM python:3.11-slim
 
 # устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
 
-# копируем файл с зависимостями
+# копируем зависимости
 COPY requirements.txt .
 
 # устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# копируем код
+# копируем
 COPY app/ ./app/
 COPY data/ ./data/
 

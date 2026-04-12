@@ -2,7 +2,7 @@ from pathlib import Path
 
 def load_docs(data_folder: str = 'data') -> dict:
     documents_rag = {}
-    data_path = Path.cwd() / data_folder
+    data_path = Path.cwd().parent / data_folder
 
     print(f'поиск файлов в: {data_path}')
     if not data_path.exists():
@@ -39,6 +39,7 @@ def search(query: str, documents:dict) -> str:
             if filename in documents:
                 print(f'Найдено по ключевому слову: "{keyword}":"{filename}"')
                 return filename
+    return documents.get("general_info.txt", "Информация не найдена")
 
 if __name__ == '__main__':
     docs = load_docs()

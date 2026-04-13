@@ -4,7 +4,7 @@ from langgraph.graph import StateGraph, END
 # импортируем функции
 # load_docs - все содержимое из data в dict
 # search - поиск в текстов по ключевым словам
-# get_llm - инициализации llm, если нет доступа к llm используется заготовленные ответы по контексту
+# get_llm - инициализации llm, если нет доступа к llm используется заготовленные ответы по контексту(называется mock)
 from app.rag import load_docs, search
 from app.llm import get_llm
 
@@ -52,34 +52,37 @@ def check_clarification_node(state: AgentState) -> Dict[str, Any]:
     context = context.lower()
     country_sensetive_keywords = ["стипендия", "налог", "виза", "рабочий день", "ставка", "зарплата", "деньги", "сколько платят"]
 
-    countries = ['германия', 'франция', 'берлин', 'париж']
+    germany_variants = ["германия", "германии", "германию", "германией", "берлин", "берлина", "берлине"]
+    france_variants = ["франция", "франции", "францию", "францией", "париж", "парижа", "париже"]
 
+    # проверяем на слова, для которых нужно уточнение
     has_sensetive = any(kw in query for kw in country_sensetive_keywords)
 
-    country_mentioned = any(c in query or c in context for c in countries)
+    # проверяем указана ил страна
+    country_mentioned_in_query = any(v in query for v in germany_variants + france_variants)
 
     needs_clarification = False
     clarification_question = ''
 
-    if has_sensetive and not country_mentioned:
+    if has_sensetive and not country_mentioned_in_query:
         needs_clarification = True
-        if 'стипендия' in query or 'сколько платят' in query:
-            topic = 'размере стипендии'
-        elif 'налог' in query:
-            topic = 'налогах'
-        elif 'виза' in query:
-            topic = 'визовых требованиях'
+
+        # определяем тему вопроса для персонализации уточнения
+        if "стипендия" in query or "платят" in query or "евро" in query:
+            topic = "размере стипендии"
+        elif "налог" in query:
+            topic = "налогах"
+        elif "виза" in query:
+            topic = "визовых требованиях"
+        elif "рабочий" in query:
+            topic = "рабочем графике"
         else:
-            topic = 'условиях стажировки'
+            topic = "условиях стажировки"
 
-        clarification_question = f'Для точного ответа о {topic} пожалуйста уточните страну: Германия или Франция'
-
-        print(f'уточните страну. Тема о {topic}')
-    else:
-        print(f'уточнение не требуется.')
+        clarification_question = f"Для точного ответа о {topic}, пожалуйста, уточните страну стажировки: Германия или Франция?"
     return {
-        'needs_clarification': needs_clarification,
-        'clarification_question': clarification_question
+        "needs_clarification": needs_clarification,
+        "clarification_question": clarification_question
     }
 
 # создает ответ, и обновляет его в state
@@ -199,8 +202,10 @@ def build_graph():
     print('graph compiled')
     return compiled_graph
 
+
 agent_graph = build_graph()
 def chat_with_agent(user_message: str, history: List[Dict[str,str]] = None) -> Dict[str, Any]:
+    # инициализируем при первом запуске
     if history is None:
         history = []
 

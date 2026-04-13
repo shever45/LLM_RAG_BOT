@@ -1,21 +1,34 @@
 from pathlib import Path
+from typing import Dict
 
-def load_docs(data_folder: str = 'data') -> dict:
-    documents_rag = {}
-    data_path = Path.cwd().parent / data_folder
+#функция ниже загружает все .txt файлы из указанной папки(data).
+#Возвращает словарь: {"имя_файла.txt": "содержимое"}
+def load_docs(data_folder: str = "data") -> Dict[str, str]:
+    documents = {}
 
-    print(f'поиск файлов в: {data_path}')
+    # определяем путь к папке data
+    # если запускаем из корня проекта
+    data_path = Path.cwd() / data_folder
+
+    # если папка не найдена, пробуем найти ее у родителей
     if not data_path.exists():
-        print(f'папка {data_path} не найдена')
-        return documents_rag
+        data_path = Path(__file__).parent.parent / data_folder
 
-    for file_path in data_path.glob('*.txt'):
-        print(f'найден: {file_path.name}')
+    if not data_path.exists():
+        print(f"ПАПКА НЕ НАЙДЕНА: {data_path}")
+        return documents
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            documents_rag[file_path.name] = content
-    return documents_rag
+    for file_path in data_path.glob("*.txt"):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                # сохраняем данные в виде словаря, название:контент
+                content = f.read().strip()
+                documents[file_path.name] = content
+        except Exception as e:
+            print(f"ошибка чтения: {e}")
+
+    print(f"всего загружено: {len(documents)} файлов")
+    return documents
 
 def search(query: str, documents:dict) -> str:
     query_lower = query.lower()
@@ -28,18 +41,79 @@ def search(query: str, documents:dict) -> str:
         "срок": "deadlines.txt",
         "дата": "deadlines.txt",
         "жилье": "benefits.txt",
+        "жильё": "benefits.txt",
         "страховка": "benefits.txt",
         "проезд": "benefits.txt",
-        "тест": "general_info.txt",
-        "собеседование": "general_info.txt",
-        "анкета": "general_info.txt",
+        "сертификат": "benefits.txt",
+        "тест": "general.txt",
+        "собеседование": "general.txt",
+        "анкета": "general.txt",
+        "резюме": "general.txt",
+        "студент": "general.txt",
+        "стипендия": ["germany_rules.txt", "france_rules.txt"],
+        "налог": ["germany_rules.txt", "france_rules.txt"],
+        "виза": ["germany_rules.txt", "france_rules.txt"],
+        "рабочий": ["germany_rules.txt", "france_rules.txt"],
+        "евро": ["germany_rules.txt", "france_rules.txt"],
+        "стажировка": "general.txt",
+        "стажировки": "general.txt",
+        "стажировке": "general.txt",
+        "стажировку": "general.txt",
+        "стажировкой": "general.txt",
     }
-    for keyword, filename in keyword_to_file.items():
+
+    country_specified = any(c in query_lower for c in ["германия", "франция", "берлин", "париж"])
+
+    for keyword, target in keyword_to_file.items():
         if keyword in query_lower:
-            if filename in documents:
-                print(f'Найдено по ключевому слову: "{keyword}":"{filename}"')
-                return filename
-    return documents.get("general_info.txt", "Информация не найдена")
+
+            # eсли target является списком файлов, как для стипендия, налог и тд.
+            if isinstance(target, list):
+                # если страна не указана то возвращаем оба файла объединёнными
+                if not country_specified:
+                    combined = ""
+                    for fname in target:
+                        if fname in documents:
+                            combined += f"\n--- {fname} ---\n{documents[fname]}\n"
+                    if combined:
+                        return combined
+                # если страна указана то пропускаем, ниже обработается отдельно
+                else:
+                    continue
+            else:
+                # target, это строка (имя одного файла)
+                if target in documents:
+                    return documents[target]
+
+    # нам нужны все формы названий слов, потому что это критично влияет на нашу программу,
+    # не верно указаня буква в названии страны и сразу же выводит ответ: Уточните страну?
+    GERMANY_VARIANTS = [
+        "германия", "германии", "германию", "германией", "германией",
+        "берлин", "берлина", "берлину", "берлином", "берлине"
+    ]
+
+    FRANCE_VARIANTS = [
+        "франция", "франции", "францию", "францией", "франциею",
+        "париж", "парижа", "парижу", "парижем", "париже"
+    ]
+
+        # Отдельная проверка для случаев, когда пользователь написал только страну
+    if any(variant in query_lower for variant in GERMANY_VARIANTS):
+        if "germany_rules.txt" in documents:
+            print(f"найдена страна: Германия")
+            return documents["germany_rules.txt"]
+
+    if any(variant in query for variant in FRANCE_VARIANTS):
+        if "france_rules.txt" in documents:
+            print(f"найдена страна: Франция")
+            return documents["france_rules.txt"]
+
+    if any(root in query_lower for root in ["стажировк", "анкет", "резюме", "собеседовани", "тестировани", "студент"]):
+        return documents.get("general.txt", "")
+
+    # елси не найдет совпадений, то выводит общую информацию
+    return documents.get("general.txt", "Информация не найдена.")
+
 
 if __name__ == '__main__':
     docs = load_docs()

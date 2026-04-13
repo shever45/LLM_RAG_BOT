@@ -57,52 +57,66 @@ class MockLLM:
 def get_llm():
     """
     возвращает любую подключенную и настроенную llm
-    в зависимости от содержания .env
     Первоочерендно проверим на работующие llm, в другом случае вернем mockllm
     """
 
-    # если переменная LLM_PROVIDER не будет найдена в .env, будем использовать логику класса mock_llm
-    provider = os.getenv('LLM_PROVIDER', "mock").lower()
+    DEFAULT_PROVIDER = "local"  # local / openai / compatible
+    DEFAULT_MODEL = "llama3.2"
+    DEFAULT_BASE_URL = "http://localhost:11434/v1"
+    DEFAULT_API_KEY = ""  # для openai и compatible
+    DEFAULT_TEMPERATURE = 0.1
+    DEFAULT_MAX_TOKENS = 1000
 
-    # в пример я взял deepseek, но если нужно что то другое,
-    # мы просто добавим в .env новые переменные и перепишем логику ниже на другую llm
-    if provider == 'deepseek':
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not api_key:
-            print('Ключ deepseek не найден, используем mockLLM')
-            return MockLLM
+    # я проверял только на локальной llm ollama
+    if DEFAULT_PROVIDER == "local":
         try:
-            # импортируем внутри функции потому что, если отсутствует ключ, то библиотека будет занимать лишние ресурсы,
-            # также для того чтобы обработать ошибки ImportError и Exception(проблемы с ключом)
             from langchain_openai import ChatOpenAI
-
-            # берем характеристики из .env, и на всякий случай делаем дефолтные если переменная не найдется
-            model = os.getenv("LLM_MODEL", "deepseek-chat")
-            base_url = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
-            temperature = float(os.getenv("LLM_TEMPERATURE", "0.1"))
-            max_tokens = int(os.getenv("LLM_MAX_TOKENS", "500"))
-
-            print(f'используется deepseek: {model}')
-            print(f'base url: {base_url}')
+            print(f"использую локальную модель: {DEFAULT_MODEL} на {DEFAULT_BASE_URL}")
 
             return ChatOpenAI(
-                model = model,
-                api_key = api_key,
-                base_url=base_url,
-                temperature=temperature,
-                max_tokens=max_tokens
+                model=DEFAULT_MODEL,
+                base_url=DEFAULT_BASE_URL,
+                api_key="not-needed",
+                temperature=DEFAULT_TEMPERATURE,
+                max_tokens=DEFAULT_MAX_TOKENS
             )
-        except ImportError as e:
-            print(f'ошибка импорта langchain_openai: {e}')
-            return MockLLM()
+        # при ошибке подключения будет запускаться if/else коснтрукция
         except Exception as e:
-            print(f'ошибка инициализации deepseek: {e}')
             return MockLLM()
 
-    elif provider == 'mock':
-        print('используем mock')
-        return MockLLM()
+        # --- OPENAI ---
+    elif DEFAULT_PROVIDER == "openai":
+            try:
+                from langchain_openai import ChatOpenAI
+                print(f"[LLM] OpenAI: {DEFAULT_MODEL}")
+                return ChatOpenAI(
+                    model=DEFAULT_MODEL,
+                    api_key=DEFAULT_API_KEY,
+                    temperature=DEFAULT_TEMPERATURE,
+                    max_tokens=DEFAULT_MAX_TOKENS
+                )
+            except Exception as e:
+                print(f"[LLM] Ошибка подключения к OpenAI: {e}")
+                return MockLLM()
+
+        # --- OPENAI-СОВМЕСТИМЫЕ (DeepSeek, Groq, Together, и т.д.) ---
+    elif DEFAULT_PROVIDER == "compatible":
+        try:
+            from langchain_openai import ChatOpenAI
+            print(f"[LLM] Совместимое API: {DEFAULT_MODEL} на {DEFAULT_BASE_URL}")
+            return ChatOpenAI(
+                model=DEFAULT_MODEL,
+                base_url=DEFAULT_BASE_URL,
+                api_key=DEFAULT_API_KEY,
+                temperature=DEFAULT_TEMPERATURE,
+                max_tokens=DEFAULT_MAX_TOKENS
+            )
+        except Exception as e:
+            print(f"Ошибка подключения к API: {e}")
+            return MockLLM()
+
     else:
+        print(f"Неизвестный провайдер '{DEFAULT_PROVIDER}', использую MockLLM")
         return MockLLM()
 
 if __name__ == '__main__':

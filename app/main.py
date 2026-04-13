@@ -14,6 +14,7 @@ class ChatResponse(BaseModel):
     session_id: str
     needs_clarification: bool = False
 
+# реализуем хранилтище сессий и всего диалога сессии
 sessions: Dict[str, List[Dict[str,str]]] = {}
 
 app = FastAPI(
@@ -21,21 +22,10 @@ app = FastAPI(
     description="Чат-бот для консультаций по международной стажировке CdekStart")
 
 # documents_main = load_docs()
-# print(f"загружено документов: {len(documents_main)}")
-
-@app.get('/')
-def read_root():
-    return {
-        "service": "CdekStart RAG Agent",
-        "status": "running",
-        "endpoints": {
-            "chat": "/chat",
-            "docs": "/docs"
-        }
-    }
 
 @app.post('/chat', response_model=ChatResponse)
 def chat(request: ChatRequest):
+    # создаем новую или берем старую сессию
     session_id = request.session_id or str(uuid.uuid4())
     history = sessions.get(session_id, [])
 
